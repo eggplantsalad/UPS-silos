@@ -1,0 +1,13 @@
+{
+  "name": "UPS-silos",
+  "version": "0.1.0",
+  "title": "U.P.S. Silo (Unified Production Supply Silo)",
+  "author": "eggplantsalad",
+  "factorio_version": "2.0",
+  "homepage": "https://github.com/eggplantsalad/UPS-silos",
+  "dependencies": ["base >= 2.0.0"],
+  "package": {
+    "ignore": [".claude/*", ".git/", ".gitignore", "screenshots/*"]
+  },
+  "description": "A wide/tall buffer chest for train-loading megabases with many stations. Unlike merged/warehouse chests, which add more slots as they grow, this keeps a fixed, small slot count and multiplies per-slot stack size instead - it stays UPS-efficient no matter how wide it gets, and reads out over a single circuit wire. See README for credits and details."
+}

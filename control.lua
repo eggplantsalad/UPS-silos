@@ -1,0 +1,4 @@
+-- Intentionally empty. Horizontal and vertical silos are two independent
+-- items/entities/recipes (see recipe.lua, data.lua) - no rotation illusion,
+-- so no runtime scripting is needed to place, pipette, mine, or blueprint
+-- either orientation; the engine handles all of that natively.
