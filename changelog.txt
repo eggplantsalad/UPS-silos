@@ -1,0 +1,50 @@
+---------------------------------------------------------------------------------------------------
+Version: 0.2.0
+Date: 2026-09-08
+  Features:
+    - Collapsed the 53 separate craftable silo items down to a single generic
+      item, carried and dragged to size/orientation on the map (1xN or Nx1
+      selection, up to 27 tiles) - the specific sized silo is resolved right
+      there at build time, not chosen ahead of time at the crafting menu.
+      No more stocking 27+ dedicated items per orientation: a requester
+      chest or a bot's own cargo needs only the one generic item, in a
+      quantity matching whatever mix of sizes it's building, and manual
+      (non-bot) building works the same way.
+    - Rotating (the same key as vanilla's rotate) while holding a silo item
+      or ghost-aim swaps it for its same-size opposite-orientation
+      counterpart, since horizontal and vertical are separate entities
+      rather than direction variants of one. Doesn't affect blueprint
+      contents - see the README's Known limitations.
+    - Silos now show the vanilla slot-limiter bar in their GUI, letting you
+      cap how many of the 10 slots are usable, same as any other chest.
+  Changes:
+    - Deconstruction always collapses a silo back into the generic items,
+      never a specific sized one.
+    - Bots prefer building from an owned specific item when available,
+      falling back to the generic item (linear in size) otherwise.
+    - Pipetting (Q) a ghost or an already-built silo redoes the same
+      generic-to-specific trade.
+    - Remote view only ever produces a free ghost-aim when pipetting, never
+      manifests or consumes a real item, since there's no physical body
+      present to hold one there.
+  Info:
+    - The 53 specific sized items are meant to exist only momentarily, in
+      the cursor, mid-placement. The stray-item reclaim only watches the
+      player's own main inventory, so a specific item can still persist
+      elsewhere if it's moved directly into another inventory without ever
+      passing through the main one - e.g. shift-click-transferred straight
+      into a chest, a vehicle trunk, a train wagon, or another player's
+      inventory, or picked up off the ground by a construction bot or
+      spidertron rather than a player. This is harmless (the item is fully
+      functional and still correctly builds its silo) but means it won't
+      automatically collapse back into the generic item in those cases.
+    - Upgrading an existing save from 0.1.0: already-placed silos are
+      unaffected - entity names didn't change. Old specific sized items
+      (crafted under the old per-size recipes) remain valid and placeable
+      too; any sitting in a player's own main inventory will automatically
+      convert into the equivalent generic items the next time that
+      inventory changes, while any sitting elsewhere (a chest, a vehicle,
+      bot cargo) are left alone and stay usable as-is. The old per-size
+      recipes themselves no longer exist at all though - any assembling
+      machine set to craft one will lose that recipe selection and needs
+      to be manually reassigned to craft the generic item instead.

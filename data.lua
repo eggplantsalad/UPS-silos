@@ -4,11 +4,13 @@
 -- The item-group/item-subgroup prototypes live in recipe.lua, alongside the
 -- items that actually use them.
 
+local icon_helpers = require("icon-helpers")
+
 -- Applied to body layers only (not shadows - multiplying near-black pixels
 -- does nothing useful). tint multiplies the sprite's existing colors, so
 -- this warms the already-light ribbed-metal areas toward amber rather than
 -- recoloring the whole chest outright.
-local SILO_TINT = {r = 1, g = 0.65, b = 0.3, a = 1}
+local SILO_TINT = icon_helpers.ICON_TINT
 
 for i = 1, 27 do
     -- ========================================================================
@@ -25,12 +27,7 @@ for i = 1, 27 do
         return -(i * 0.5) + (tile - 0.5)
     end
 
-    -- 1. Base Entity Texture Slicing (64x80 canvas slices). No i==1 special
-    -- case needed: the left- and right-cap tile-grid positions naturally
-    -- coincide when i==1, so both draw layered on top of each other,
-    -- producing a complete-looking standalone box (a lone left cap has an
-    -- open/unfinished right edge - that's normally covered by whatever
-    -- comes next - so it looked wrong used on its own).
+    -- 1. Base Entity Texture Slicing (64x80 canvas slices).
     table.insert(horiz_layers, {
         filename = "__UPS-silos__/graphics/entity/wide-chest.png",
         priority = "extra-high",
@@ -82,10 +79,6 @@ for i = 1, 27 do
     -- art is genuinely a different height than the middle (54/90px vs
     -- 64px) - each piece is anchored to its own tile-grid position plus 
     -- WideChests' own per-piece fine-tuning nudge.
-    -- No i==1 special case needed here either - top- and bottom-cap
-    -- tile-grid positions naturally coincide when i==1, so both draw
-    -- layered, giving a complete standalone box instead of a lone bottom
-    -- cap with an open/unfinished top edge.
     table.insert(vert_layers, {
         filename = "__UPS-silos__/graphics/entity/high-chest.png",
         priority = "extra-high",
@@ -141,26 +134,26 @@ for i = 1, 27 do
     local silo_stack_multiplier = 4 * i
 
     if i == 1 then
-        -- ups-silo-1x1: "ups-silo-" .. i .. "x1" and "ups-silo-1x" .. i are
-        -- the SAME string at i=1, so the horizontal and vertical blocks
-        -- below would both try to define an entity named "ups-silo-1x1" -
-        -- a duplicate-name error (data:extend rejects reusing a prototype
-        -- name). Orientation is meaningless for a 1-tile chest anyway, so
-        -- there's just one shared entity here, styled like a plain vanilla
-        -- chest instead of a slice of the long-strip wide/high chest art
-        -- (which only looks right at 2+ tiles) - matching how WideChests
-        -- itself never bothers with custom art for an unmerged single chest.
-        -- recipe.lua skips creating a separate vertical item at size 1 for
-        -- the same reason - ups-silo-item-1 is the only item that
-        -- place_results into this name.
+        -- "ups-silo-" .. i .. "x1" and "ups-silo-1x" .. i are the SAME
+        -- string at i=1, so the horizontal/vertical blocks below would
+        -- collide on one name. Orientation is meaningless for a 1-tile
+        -- chest anyway, so there's just one shared entity here, styled like
+        -- a plain vanilla chest instead of a wide/high-chest slice (which
+        -- only looks right at 2+ tiles) - recipe.lua skips a separate
+        -- vertical item at size 1 for the same reason.
         data:extend({
             {
                 type = "container",
                 name = "ups-silo-1x1",
-                icon = "__base__/graphics/icons/steel-chest.png",
+                icons = icon_helpers.build_size_icons("__base__/graphics/icons/steel-chest.png", 1),
                 icon_size = 64,
                 localised_name = {"ups-silo.name-1x1"},
-                localised_description = {"ups-silo.stack-info-1x1", tostring(silo_stack_multiplier)},
+                localised_description = {"ups-silo.stack-info-entity-1x1", tostring(silo_stack_multiplier), tostring(i)},
+                -- Deliberately NOT hidden - this entity is the real,
+                -- permanent thing worth documenting. The reference item that
+                -- place_results into it IS hidden (see recipe.lua), since
+                -- that item is accidental plumbing a player should never go
+                -- looking up on its own.
                 flags = {"placeable-neutral", "player-creation"},
                 max_health = 500,
 
@@ -173,14 +166,32 @@ for i = 1, 27 do
                     -- vanilla-looking 1x1 gets this - the surprise lands
                     -- better on the one silo that looks like nothing special,
                     -- not diluted across all 27 obviously-massive sizes.
-                    stack_size_override = { ["raw-fish"] = 1000000000 }
+                    stack_size_override = { ["raw-fish"] = 1000000000 },
+                    with_bar = true
                 },
 
                 -- Same squeeze-through margin as the multi-tile variants, applied
                 -- symmetrically since there's no "row direction" for a single tile.
                 collision_box = {{-0.25, -0.25}, {0.25, 0.25}},
                 selection_box = {{-0.5, -0.5}, {0.5, 0.5}},
-                minable = { mining_time = 0.2, result = "ups-silo-item-1" },
+                -- Deconstruction collapses back down to the generic remote,
+                -- not the reference-only ups-silo-item-1 - same resource in,
+                -- same resource out. Count matches placeable_by below, so
+                -- build cost and refund stay symmetric.
+                minable = { mining_time = 0.2, result = "ups-silo-generic", count = 1 },
+                -- Two independent ways to satisfy a ghost of this entity.
+                -- Real item listed first - placeable_by order is what bots
+                -- and pipette (see control.lua) both use to pick between
+                -- alternatives - though it's never actually stocked in a
+                -- logistics network, so bots fall through to the generic
+                -- remote in practice; a player who's traded for the real
+                -- item can still build it by hand directly, since unlike
+                -- the remote it's a genuinely placeable item.
+                placeable_by = {
+                    { item = "ups-silo-item-1", count = 1 },
+                    { item = "ups-silo-generic", count = 1 }
+                },
+                circuit_connector = circuit_connector_definitions["chest"],
                 circuit_wire_max_distance = 3,
                 picture = {
                     layers = {
@@ -210,17 +221,16 @@ for i = 1, 27 do
             {
                 type = "container",
                 name = "ups-silo-" .. i .. "x1",
-                icon = "__UPS-silos__/graphics/entity/wide-chest.png",
+                icons = icon_helpers.build_size_icons("__UPS-silos__/graphics/entity/wide-chest-icon.png", i),
                 icon_size = 64,
-                icon_x = 0, icon_y = 0,
                 localised_name = {"ups-silo.name-horizontal", tostring(i)},
-                localised_description = {"ups-silo.stack-info", tostring(silo_stack_multiplier)},
+                localised_description = {"ups-silo.stack-info-entity", tostring(silo_stack_multiplier), tostring(i)},
                 flags = {"placeable-neutral", "player-creation"},
                 max_health = 500,
 
                 inventory_size = silo_inventory_size,
                 inventory_type = "with_custom_stack_size",
-                inventory_properties = { stack_size_multiplier = silo_stack_multiplier },
+                inventory_properties = { stack_size_multiplier = silo_stack_multiplier, with_bar = true },
 
                 -- +-0.25 on every side (both the long-axis ends and the
                 -- perpendicular sides) leaves a 0.5-tile gap between two
@@ -230,7 +240,17 @@ for i = 1, 27 do
                 -- walk through, from any side.
                 collision_box = {{-((i * 0.5) - 0.25), -0.25}, {((i * 0.5) - 0.25), 0.25}},
                 selection_box = {{-((i * 0.5)), -0.5}, {((i * 0.5)), 0.5}},
-                minable = { mining_time = 0.2, result = "ups-silo-item-" .. i },
+                -- Deconstruction collapses back down to the generic remote,
+                -- scaled the same as the build cost below - build N, get N
+                -- back.
+                minable = { mining_time = 0.2, result = "ups-silo-generic", count = i },
+                -- Same reasoning as the 1x1's placeable_by above - generic
+                -- remote cost scales linearly with size here.
+                placeable_by = {
+                    { item = "ups-silo-item-" .. i, count = 1 },
+                    { item = "ups-silo-generic", count = i }
+                },
+                circuit_connector = circuit_connector_definitions["chest"],
                 circuit_wire_max_distance = i + 2,
                 picture = { layers = horiz_layers }
             }
@@ -241,22 +261,30 @@ for i = 1, 27 do
             {
                 type = "container",
                 name = "ups-silo-1x" .. i,
-                icon = "__UPS-silos__/graphics/entity/high-chest.png",
+                icons = icon_helpers.build_size_icons("__UPS-silos__/graphics/entity/high-chest-icon.png", i),
                 icon_size = 64,
-                icon_x = 0, icon_y = 0,
                 localised_name = {"ups-silo.name-vertical", tostring(i)},
-                localised_description = {"ups-silo.stack-info", tostring(silo_stack_multiplier)},
+                localised_description = {"ups-silo.stack-info-entity", tostring(silo_stack_multiplier), tostring(i)},
                 flags = {"placeable-neutral", "player-creation"},
                 max_health = 500,
 
                 inventory_size = silo_inventory_size,
                 inventory_type = "with_custom_stack_size",
-                inventory_properties = { stack_size_multiplier = silo_stack_multiplier },
+                inventory_properties = { stack_size_multiplier = silo_stack_multiplier, with_bar = true },
 
                 -- Same reasoning as the horizontal variant's collision_box - see there.
                 collision_box = {{-0.25, -((i * 0.5) - 0.25)}, {0.25, ((i * 0.5) - 0.25)}},
                 selection_box = {{-0.5, -((i * 0.5))}, {0.5, ((i * 0.5))}},
-                minable = { mining_time = 0.2, result = "ups-silo-item-v-" .. i },
+                -- Deconstruction collapses back down to the generic remote,
+                -- scaled the same as the build cost below - build N, get N
+                -- back.
+                minable = { mining_time = 0.2, result = "ups-silo-generic", count = i },
+                -- Same reasoning as the 1x1's placeable_by above.
+                placeable_by = {
+                    { item = "ups-silo-item-v-" .. i, count = 1 },
+                    { item = "ups-silo-generic", count = i }
+                },
+                circuit_connector = circuit_connector_definitions["chest"],
                 circuit_wire_max_distance = i + 2,
                 picture = { layers = vert_layers }
             }

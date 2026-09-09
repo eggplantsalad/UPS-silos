@@ -1,17 +1,11 @@
-local tech_effects = {}
-
-for i = 1, 27 do
-  table.insert(tech_effects, {
+-- Only the generic remote has a recipe - the 53 sized items are
+-- reference-only prototypes (see recipe.lua) with no recipe to unlock.
+local tech_effects = {
+  {
     type = "unlock-recipe",
-    recipe = "ups-silo-recipe-" .. i
-  })
-  if i > 1 then
-    table.insert(tech_effects, {
-      type = "unlock-recipe",
-      recipe = "ups-silo-recipe-v-" .. i
-    })
-  end
-end
+    recipe = "ups-silo-generic"
+  }
+}
 
 data:extend({
   {
