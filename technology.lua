@@ -1,11 +1,20 @@
--- Only the generic remote has a recipe - the 53 sized items are
--- reference-only prototypes (see recipe.lua) with no recipe to unlock.
+-- The generic remote's recipe, plus all 27 horizontal reference-only items'
+-- recipes (see recipe.lua) - those can never actually be crafted (hidden
+-- from player crafting, locked to a category nothing supports), but still
+-- need unlocking so they count as "enabled" and show up in the remote-view
+-- build panel.
 local tech_effects = {
   {
     type = "unlock-recipe",
     recipe = "ups-silo-generic"
   }
 }
+
+-- Horizontal only - the vertical ups-silo-item-v-* items have no recipe
+-- to unlock any more (see recipe.lua).
+for i = 1, 27 do
+  table.insert(tech_effects, {type = "unlock-recipe", recipe = "ups-silo-item-" .. i})
+end
 
 data:extend({
   {

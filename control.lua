@@ -8,9 +8,11 @@
 --
 -- grant_or_ghost() then hands over the real per-size item if
 -- owned, else spends N generic remotes to manifest one, else places a
--- ghost - same fallback vanilla uses for anything unaffordable. The
--- 53 real ups-silo-item-* prototypes deliberately have no recipe; nothing
--- ever crafts them directly, they only come from this trade. The same
+-- ghost - same fallback vanilla uses for anything unaffordable. None of
+-- the 53 real ups-silo-item-* prototypes are ever crafted directly: the 27
+-- horizontal ones have a recipe that exists only to appear "enabled" in
+-- build UIs (see recipe.lua) and can never complete, and the rest have no
+-- recipe at all - either way, they only come from this trade. The same
 -- helper runs again from on_player_pipette, since Q's own placeable_by
 -- resolution can hand back the remote itself, which has no place_result
 -- and can't complete a build on its own.
@@ -28,18 +30,32 @@ local function target_of_entity_name(entity_name)
   return nil
 end
 
--- Turns a selected area's tile dimensions into a target item, or nil if
--- the shape doesn't correspond to any silo (not 1xN/Nx1, or over 27).
-local function resolve_target(width, height)
-  width = math.max(1, math.floor(width + 0.5))
-  height = math.max(1, math.floor(height + 0.5))
+-- Turns a drag's corners into a target item, build direction, and exact
+-- placement position, or nil if the shape doesn't correspond to any
+-- silo (not 1xN/Nx1, or over 27). Snaps each corner outward to the
+-- nearest tile line (floor the top-left, ceil the bottom-right) rather
+-- than rounding the raw width/height - a drag that falls short of a
+-- clean tile boundary never shrinks the result, it only ever grows to
+-- the nearest full tile.
+local function resolve_target(area)
+  local left = math.floor(area.left_top.x)
+  local top = math.floor(area.left_top.y)
+  local right = math.ceil(area.right_bottom.x)
+  local bottom = math.ceil(area.right_bottom.y)
+  local width = math.max(1, right - left)
+  local height = math.max(1, bottom - top)
+  local position = {x = (left + right) / 2, y = (top + bottom) / 2}
 
   if width == 1 and height == 1 then
-    return "ups-silo-item-1", 1
+    return "ups-silo-item-1", 1, defines.direction.north, position
   elseif height == 1 and width <= 27 then
-    return "ups-silo-item-" .. width, width
+    return "ups-silo-item-" .. width, width, defines.direction.north, position
   elseif width == 1 and height <= 27 then
-    return "ups-silo-item-v-" .. height, height
+    -- A "tall" drag resolves to the horizontal item, rotated east.
+    -- The vertical items/entities still fully work for anything already
+    -- placed, in a blueprint, or copy-pasted (see target_of_entity_name
+    -- above), since none of that goes through here.
+    return "ups-silo-item-" .. height, height, defines.direction.east, position
   end
   return nil
 end
@@ -106,17 +122,14 @@ script.on_event(defines.events.on_player_selected_area, function(event)
   local player = game.get_player(event.player_index)
   if not player then return end
 
-  local area = event.area
-  local width = area.right_bottom.x - area.left_top.x
-  local height = area.right_bottom.y - area.left_top.y
-
-  local target_item, size = resolve_target(width, height)
+  local target_item, size, direction, position = resolve_target(event.area)
   if not target_item then
     player.play_sound{path = "utility/cannot_build"}
     return
   end
 
   grant_or_ghost(player, target_item, size)
+  player.build_from_cursor{position = position, direction = direction}
 end)
 
 -- We deliberately don't trust event.item here: Q resolves strictly by
@@ -154,7 +167,7 @@ end)
 -- inventory. Canceling a placement (e.g. right-click to cancel, or picking
 -- up something else) hands whatever's in the cursor back to the main
 -- inventory as-is though, which would otherwise leave one of these
--- deliberately-recipe-less items stranded there. Whenever the main
+-- items stranded there. Whenever the main
 -- inventory changes, silently convert any of them back into their N
 -- generics instead - cursor contents aren't part of the main inventory, so
 -- an item genuinely being held for placement is never touched by this.
@@ -194,63 +207,36 @@ script.on_event(defines.events.on_player_main_inventory_changed, function(event)
 end)
 
 -- ============================================================================
--- ORIENTATION SWAP ("ROTATE")
--- ============================================================================
--- Horizontal/vertical are separate items of the same size (see recipe.lua),
--- not direction variants of one entity, so there's nothing for vanilla's
--- own rotate-while-aiming to do here. ups-silo-rotate (see recipe.lua) is
--- linked to the player's actual rotate control and fires alongside it, so
--- this just swaps whatever's in the cursor - real item or ghost-aim - for
--- its same-size opposite-orientation counterpart. The 1x1 has no
--- orientation and is left alone.
-local function orientation_swap(name)
-  local n = name:match("^ups%-silo%-item%-(%d+)$")
-  if n then return "ups-silo-item-v-" .. n end
-  n = name:match("^ups%-silo%-item%-v%-(%d+)$")
-  if n then return "ups-silo-item-" .. n end
-  return nil
-end
-
-script.on_event("ups-silo-rotate", function(event)
-  local player = game.get_player(event.player_index)
-  if not player then return end
-
-  local cursor = player.cursor_stack
-  if cursor and cursor.valid_for_read then
-    local swapped = orientation_swap(cursor.name)
-    if swapped then
-      cursor.set_stack{name = swapped, count = cursor.count}
-    end
-    return
-  end
-
-  local ghost = player.cursor_ghost
-  -- Unlike cursor_stack, cursor_ghost's read shape hands back rich
-  -- prototype objects rather than plain strings - ghost.name is a
-  -- LuaItemPrototype here, not the item's name itself.
-  if ghost and ghost.name then
-    local swapped = orientation_swap(ghost.name.name)
-    if swapped then
-      player.cursor_ghost = {name = swapped}
-    end
-  end
-end)
-
--- ============================================================================
 -- RECIPE-ENABLED MIGRATION
 -- ============================================================================
 -- "Recipe unlocked" is a per-save flag keyed by prototype name, applied
 -- once when the technology finishes researching - if a future rename ever
 -- leaves a save with the tech researched but its current recipe name not
--- enabled, this catches it back up. Runs on every load, not just once,
--- since it's cheap and idempotent - simpler than tracking whether it's
--- already been done.
+-- enabled, this catches it back up. Also covers the 27 horizontal items'
+-- recipes added in 1.0.0: on a save where ups-silo-tech was researched
+-- before those recipes existed, the unlock-recipe effect never fires again
+-- on its own, so without this they'd stay permanently disabled and the
+-- items would never appear in the remote-view build panel. Runs on every
+-- load, not just once, since it's cheap and idempotent - simpler than
+-- tracking whether it's already been done.
+local function recipe_names_to_check()
+  local names = {"ups-silo-generic"}
+  for i = 1, 27 do
+    table.insert(names, "ups-silo-item-" .. i)
+  end
+  return names
+end
+
 script.on_configuration_changed(function()
   for _, force in pairs(game.forces) do
     local tech = force.technologies["ups-silo-tech"]
-    local recipe = force.recipes["ups-silo-generic"]
-    if tech and tech.researched and recipe and not recipe.enabled then
-      recipe.enabled = true
+    if tech and tech.researched then
+      for _, name in pairs(recipe_names_to_check()) do
+        local recipe = force.recipes[name]
+        if recipe and not recipe.enabled then
+          recipe.enabled = true
+        end
+      end
     end
   end
 end)

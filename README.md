@@ -14,7 +14,7 @@ Stack size per slot scales with the silo's size - larger silos hold proportional
 
 ![Recipe tree](screenshots/3.png)
 
-The crafting chain leading up to the silo.
+The resarch chain leading up to the silo.
 
 ![Silo close-up with tooltip](screenshots/4.png)
 
@@ -24,15 +24,22 @@ A 1x1, 1x2, and 4x1 silo up close. Ten slots, each holding several stacks worth.
 
 Vanilla has no path to a bigger chest at all - steel-chest is the ceiling. A few great community mods fill that gap by merging chests into a wider one, but the ones I looked at give a bigger chest more slots as it grows, and slot count is what actually costs UPS to simulate - so the wide chest itself becomes the new bottleneck at scale.
 
-This mod takes a different route: a fixed, small slot count (10) with the *stack size per slot* multiplied instead, using Factorio 2.0's `inventory_type = "with_custom_stack_size"`. A 20-tile-wide silo has the same 10 slots as a 2-tile one - it just holds proportionally more per slot. A single circuit wire on the entity reads the whole contents efficiently.
+This mod takes a different route: a fixed, small slot count (10) with the *stack
+size per slot* multiplied instead. A 20-tile-wide silo has the same 10 slots as
+a 2-tile one - it just holds proportionally more per slot. A single circuit wire
+on the entity reads the whole contents efficiently.
 
 Further, the mod provides reliable blueprinting, something the otherwise mighty bulk rail loaders seem to struggle with. I would have happily kept using them and skipped writing my own - but blueprint/copy-paste stamping their stations was (systematically?) unreliable. Sometimes a paste would place cleanly, sometimes it wouldn't. A theory is contention/races around the hidden inserters/loaders they build alongside the visible entities, but that's speculation. Either way, this mod places single physical entities with nothing hidden to construct alongside it - blueprinting is just normal entity placement and should be very robust.
 
 ## How it's built
 
-Despite 27 sizes in 2 orientations, there's only one craftable item: a generic silo you drag across the map to the size/shape you want (1 tile tall for horizontal, 1 tile wide for vertical, 1x1 for the smallest). The specific sized silo is resolved right there at build time, not picked ahead of time at the crafting menu.
+Despite 27 sizes, there's only one craftable item: a generic silo you drag across the map to the size/shape you want (1 tile tall for horizontal, 1 tile wide for vertical, 1x1 for the smallest). The specific sized silo is resolved right there at build time, not picked ahead of time at the crafting menu.
 
-That means nothing needs to stock 54 dedicated items to keep a base running. A requester chest, a bot's own cargo, or your own inventory only ever needs the one generic item - in whatever quantity matches the mix of sizes being built (N generics per N-tile silo). Deconstructing, canceling a placement, or pipetting an existing silo all hand generics back the same way, so there's nothing to sort or clean up afterward either.
+That means nothing needs to stock 27 dedicated items to keep a base running. A requester chest, a bot's own cargo, or your own inventory only ever needs the one generic item - in whatever quantity matches the mix of sizes being built (N generics per N-tile silo). Deconstructing, canceling a placement, or pipetting an existing silo all hand generics back the same way, so there's nothing to sort or clean up afterward either.
+
+## Compatibility
+
+Requires Factorio 2.1+. Upgrading an existing save is safe - already-placed silos and research progress are unaffected.
 
 ## Credits
 
@@ -40,4 +47,8 @@ That means nothing needs to stock 54 dedicated items to keep a base running. A r
 
 ## Known limitations
 
-Containers can't rotate their collision box in Factorio's engine, so horizontal and vertical are separate items/entities rather than one item you rotate - there's a single generic item you carry and drag to the size/orientation you want, and pressing rotate swaps whatever's in your cursor (a real item or a ghost-aim) for its same-size opposite-orientation counterpart. That swap only applies to the cursor though. Two consequences follow from the underlying constraint: 1) a blueprint containing this chest can only be rotated 180 deg or mirrored (both come out correct) - a genuine 90/270 deg rotation doesn't work, since that would require the entity itself to swap from wide to tall, which Factorio's engine won't do automatically, and our rotate-key handling doesn't touch blueprint contents at all. 2) The 53 real per-size/orientation items are meant to exist only momentarily, in the cursor, mid-placement - a stray one can still end up resting somewhere else (a chest, a vehicle trunk, another player's inventory, a bot's cargo) if it's moved there without ever passing through your own main inventory, where it would otherwise be silently converted back into the generic item.
+The 27 real per-size items are meant to exist only momentarily, in the cursor,
+mid-placement - a stray one can still end up resting somewhere else (a chest, a
+vehicle trunk, another player's inventory, a bot's cargo) if it's moved there
+without ever passing through your own main inventory, where it would otherwise
+be silently converted back into the generic item.

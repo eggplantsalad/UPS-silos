@@ -1,4 +1,30 @@
 ---------------------------------------------------------------------------------------------------
+Version: 1.0.0
+Date: 2026-10-29
+  Features:
+    - Updated for Factorio 2.1. Silos can now be rotated freely while
+      building, dragging, or in blueprints/copy-paste. Once placed, a
+      silo can only be flipped 180 deg, not turned a full 90 deg - a
+      standard engine restriction for non-square buildings.
+    - Dragging the generic remote now places the silo immediately,
+      correctly sized and oriented, instead of needing a second click -
+      and no longer undersizes a sloppy drag.
+  Changes:
+    - Removed the old rotate-key item-swap hack - superseded by native
+      rotation above.
+    - A "tall" drag now always produces a horizontal silo rotated 90 deg
+      instead of a separate vertical item/entity. The vertical items and
+      entities still work fully for anything already placed, blueprinted,
+      or copy-pasted from before this version, but nothing new creates
+      them any more.
+    - Factoriopedia cleanup: removed the legacy vertical entries;
+      each horizontal size is now a single page instead of a
+      duplicate pair, and its recipe shows the real generic-chest cost
+      instead of a misleading empty one.
+  Info:
+    - Upgrading an existing save: already-placed silos and research state
+      are unaffected.
+---------------------------------------------------------------------------------------------------
 Version: 0.2.0
 Date: 2026-09-08
   Features:

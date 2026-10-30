@@ -149,13 +149,23 @@ for i = 1, 27 do
                 icon_size = 64,
                 localised_name = {"ups-silo.name-1x1"},
                 localised_description = {"ups-silo.stack-info-entity-1x1", tostring(silo_stack_multiplier), tostring(i)},
-                -- Deliberately NOT hidden - this entity is the real,
-                -- permanent thing worth documenting. The reference item that
-                -- place_results into it IS hidden (see recipe.lua), since
-                -- that item is accidental plumbing a player should never go
-                -- looking up on its own.
+                -- Hidden too, same as the reference item that place_results
+                -- into it (see recipe.lua) - since item and entity don't
+                -- share a name, Factoriopedia couldn't collapse them into
+                -- one row on its own, so without this you'd get a
+                -- redundant standalone "(Entity)" page alongside the full
+                -- "(Recipe/Item/Entity)" one the item's recipe already
+                -- pulls this entity's own info into.
+                hidden_in_factoriopedia = true,
                 flags = {"placeable-neutral", "player-creation"},
                 max_health = 500,
+
+                -- Square footprint, so all 4 orientations look and connect
+                -- identically - picture below is a plain Sprite (not a
+                -- north/east/south/west split), which Sprite4Way applies to
+                -- every direction unchanged, and the circuit_connector array
+                -- below just repeats the same single definition 4 times.
+                direction_count = 4,
 
                 inventory_size = silo_inventory_size,
                 inventory_type = "with_custom_stack_size",
@@ -191,7 +201,15 @@ for i = 1, 27 do
                     { item = "ups-silo-item-1", count = 1 },
                     { item = "ups-silo-generic", count = 1 }
                 },
-                circuit_connector = circuit_connector_definitions["chest"],
+                -- One entry per direction (required once direction_count > 1)
+                -- - all 4 identical since a 1x1 connector point looks the
+                -- same from any rotation.
+                circuit_connector = {
+                    circuit_connector_definitions["chest"],
+                    circuit_connector_definitions["chest"],
+                    circuit_connector_definitions["chest"],
+                    circuit_connector_definitions["chest"]
+                },
                 circuit_wire_max_distance = 3,
                 picture = {
                     layers = {
@@ -223,8 +241,10 @@ for i = 1, 27 do
                 name = "ups-silo-" .. i .. "x1",
                 icons = icon_helpers.build_size_icons("__UPS-silos__/graphics/entity/wide-chest-icon.png", i),
                 icon_size = 64,
-                localised_name = {"ups-silo.name-horizontal", tostring(i)},
+                localised_name = {"ups-silo.name-sized", tostring(i)},
                 localised_description = {"ups-silo.stack-info-entity", tostring(silo_stack_multiplier), tostring(i)},
+                -- Hidden - same reasoning as the 1x1 entity above.
+                hidden_in_factoriopedia = true,
                 flags = {"placeable-neutral", "player-creation"},
                 max_health = 500,
 
@@ -237,7 +257,10 @@ for i = 1, 27 do
                 -- directly-adjacent silos in any direction - the vanilla
                 -- player character's own collision_box is only 0.4 tile wide
                 -- ({-0.2,-0.2},{0.2,0.2}), so that's comfortably enough to
-                -- walk through, from any side.
+                -- walk through, from any side. Defined for the north/south
+                -- (wide) facing only - the engine auto-swaps x/y for the
+                -- east/west (tall) facing on its own, same as any other
+                -- rotatable asymmetric vanilla building (e.g. the boiler).
                 collision_box = {{-((i * 0.5) - 0.25), -0.25}, {((i * 0.5) - 0.25), 0.25}},
                 selection_box = {{-((i * 0.5)), -0.5}, {((i * 0.5)), 0.5}},
                 -- Deconstruction collapses back down to the generic remote,
@@ -250,9 +273,29 @@ for i = 1, 27 do
                     { item = "ups-silo-item-" .. i, count = 1 },
                     { item = "ups-silo-generic", count = i }
                 },
-                circuit_connector = circuit_connector_definitions["chest"],
+                direction_count = 4,
+                -- One entry per direction (same single stock connector
+                -- definition repeated 4x, as neither entity ever varied
+                -- this by size or orientation to begin with).
+                circuit_connector = {
+                    circuit_connector_definitions["chest"],
+                    circuit_connector_definitions["chest"],
+                    circuit_connector_definitions["chest"],
+                    circuit_connector_definitions["chest"]
+                },
                 circuit_wire_max_distance = i + 2,
-                picture = { layers = horiz_layers }
+                -- North/south keep the wide look (horiz_layers), east/west
+                -- switch to the tall look (vert_layers) - the footprint the
+                -- auto-rotated collision_box above actually occupies once
+                -- facing that way. No front/back on a plain container, so
+                -- north reuses the same art as south, and east as west,
+                -- rather than drawing a mirrored variant for each.
+                picture = {
+                    north = { layers = horiz_layers },
+                    east = { layers = vert_layers },
+                    south = { layers = horiz_layers },
+                    west = { layers = vert_layers }
+                }
             }
         })
 
@@ -263,8 +306,14 @@ for i = 1, 27 do
                 name = "ups-silo-1x" .. i,
                 icons = icon_helpers.build_size_icons("__UPS-silos__/graphics/entity/high-chest-icon.png", i),
                 icon_size = 64,
-                localised_name = {"ups-silo.name-vertical", tostring(i)},
+                localised_name = {"ups-silo.name-sized", tostring(i)},
                 localised_description = {"ups-silo.stack-info-entity", tostring(silo_stack_multiplier), tostring(i)},
+                -- The horizontal entity's own page already documents the
+                -- rotatable shape fully (see its direction_count = 4
+                -- above) - this one's purely a back-compat duplicate for
+                -- anything already placed/blueprinted, not something
+                -- worth surfacing in Factoriopedia any more.
+                hidden_in_factoriopedia = true,
                 flags = {"placeable-neutral", "player-creation"},
                 max_health = 500,
 
@@ -284,9 +333,22 @@ for i = 1, 27 do
                     { item = "ups-silo-item-v-" .. i, count = 1 },
                     { item = "ups-silo-generic", count = i }
                 },
-                circuit_connector = circuit_connector_definitions["chest"],
+                direction_count = 4,
+                circuit_connector = {
+                    circuit_connector_definitions["chest"],
+                    circuit_connector_definitions["chest"],
+                    circuit_connector_definitions["chest"],
+                    circuit_connector_definitions["chest"]
+                },
                 circuit_wire_max_distance = i + 2,
-                picture = { layers = vert_layers }
+                -- Mirror of the horizontal entity above: north/south keep
+                -- the tall look, east/west switch to the wide look.
+                picture = {
+                    north = { layers = vert_layers },
+                    east = { layers = horiz_layers },
+                    south = { layers = vert_layers },
+                    west = { layers = horiz_layers }
+                }
             }
         })
     end

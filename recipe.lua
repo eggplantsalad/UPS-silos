@@ -23,6 +23,15 @@ data:extend({
     name = "ups-silo-chassis-vertical",
     group = "ups-silo-group",
     order = "b"
+  },
+  {
+    -- No machine or character ever declares support for this category, so
+    -- a recipe placed in it can never actually be crafted anywhere - belt
+    -- and suspenders alongside hide_from_player_crafting below, since the
+    -- 53 reference items must never actually be produced, only exist as
+    -- enabled-recipe plumbing so they appear in build/ghost-placement UIs.
+    type = "recipe-category",
+    name = "ups-silo-reference-only"
   }
 })
 
@@ -92,39 +101,28 @@ data:extend({
 })
 
 -- ============================================================================
--- ORIENTATION SWAP ("ROTATE")
+-- INITIALIZE THE 53 REFERENCE-ONLY ITEMS (27 SIZES h/v, 1x1 once)
 -- ============================================================================
--- Horizontal and vertical silos are independent entities/items, not one
--- rotatable entity with direction variants (see data.lua) - so vanilla's
--- own rotate-while-aiming does nothing for them. This custom input is
--- linked to the player's actual "rotate" control (whatever it's bound to,
--- fires alongside vanilla's own handling of it rather than replacing it)
--- so control.lua can swap the cursor's item/ghost for its same-size
--- opposite-orientation counterpart instead.
-data:extend({
-  {
-    type = "custom-input",
-    name = "ups-silo-rotate",
-    key_sequence = "",
-    linked_game_control = "rotate"
-  }
-})
-
--- ============================================================================
--- INITIALIZE THE 27 REFERENCE-ONLY ITEMS
--- ============================================================================
--- These 53 items are never crafted and never sit in a player's inventory -
--- deliberately no recipe. They exist purely as place_result targets: the
--- generic remote's confirm step points player.cursor_ghost at one of these
--- by name, which is how the engine resolves which entity the resulting
--- ghost represents. Construction of that ghost is satisfied by the generic
--- remote itself (see placeable_by on each entity in data.lua), never by
--- these items - so pipette, mining, blueprints etc. never need to touch
--- them either.
+-- These 53 items are never crafted and never sit in a player's inventory.
+-- They exist purely as place_result targets: the generic remote's confirm
+-- step points player.cursor_ghost at one of these by name, which is how the
+-- engine resolves which entity the resulting ghost represents. Construction
+-- of that ghost is satisfied by the generic remote itself (see placeable_by
+-- on each entity in data.lua), never by these items - so pipette, mining,
+-- blueprints etc. never need to touch them either.
+--
+-- Only the 27 horizontal items get a recipe (unlocked by ups-silo-tech,
+-- see technology.lua), purely so the item counts as "enabled" - that's
+-- what Factorio's remote-view build panel (the normal "E" inventory/
+-- crafting screen) actually keys off to decide what to list, independent
+-- of the "Show all items in selection lists" setting. The recipe can never
+-- actually complete though: hide_from_player_crafting keeps it off the
+-- player's own crafting list, and its category (ups-silo-reference-only)
+-- is one no character or machine declares support for. The 26 vertical
+-- items (below, i > 1) have no recipe at all - they're back-compat-only,
+-- never freshly granted (see control.lua's resolve_target).
 for i = 1, 27 do
   data:extend({
-    -- Horizontal and vertical are just two independent, honestly-different
-    -- items - no rotation illusion, no shared identity.
     {
       type = "item",
       name = "ups-silo-item-" .. i,
@@ -133,10 +131,11 @@ for i = 1, 27 do
       icons = build_size_icons((i == 1) and "__base__/graphics/icons/steel-chest.png"
         or "__UPS-silos__/graphics/entity/wide-chest-icon.png", i),
       icon_size = 64,
-      localised_name = (i == 1) and {"ups-silo.name-1x1"} or {"ups-silo.name-horizontal", tostring(i)},
-      -- Size 1 gets its own description key with a subtle fish-sink hint -
-      -- see locale.cfg. The other 26 share the plain stack-info template.
-      localised_description = {(i == 1) and "ups-silo.stack-info-1x1" or "ups-silo.stack-info", tostring(4 * i), tostring(i)},
+      localised_name = (i == 1) and {"ups-silo.name-1x1"} or {"ups-silo.name-sized", tostring(i)},
+      -- No localised_description here any more - Factoriopedia merges
+      -- this item's page with its recipe and entity (both below), and
+      -- the entity's own description (see data.lua) already covers it;
+      -- a separate item-side description would just duplicate that.
       group = "ups-silo-group",
       subgroup = "ups-silo-chassis",
       order = "b[" .. string.format("%02d", i) .. "]",
@@ -144,10 +143,30 @@ for i = 1, 27 do
       place_result = "ups-silo-" .. i .. "x1",
       -- These 53 items are accidental/exceptional plumbing - they should
       -- never rest anywhere real (see the reclaim logic in control.lua) and
-      -- a player should never need to go looking one up on its own. The
-      -- entity itself is the real, permanent thing worth documenting - see
-      -- data.lua, which is deliberately NOT hidden.
-      hidden_in_factoriopedia = true
+      -- a player should never need to go looking one up on its own. Not
+      -- hidden from Factoriopedia though (unlike the legacy vertical
+      -- items, see further down): the entity's hidden instead (see
+      -- data.lua), so this item is the only non-hidden prototype in its
+      -- family, anchoring the merged Factoriopedia row - same as how a
+      -- vanilla item/entity pair anchors theirs - instead of that row
+      -- falling back to the recipe and showing a "(Recipe)" hover-label
+      -- mismatch against every vanilla entry.
+      hidden_in_factoriopedia = false
+    },
+    {
+      type = "recipe",
+      name = "ups-silo-item-" .. i,
+      enabled = false,
+      hide_from_player_crafting = true,
+      categories = {"ups-silo-reference-only"},
+      -- Reflects the real cost of the drag/pipette trade (see
+      -- control.lua's grant_or_ghost) rather than being left empty -
+      -- an empty ingredients list showed as a misleading "None" on the
+      -- Factoriopedia page merged in from this recipe. Still can never
+      -- actually be crafted either way (hide_from_player_crafting, plus
+      -- a category no machine/character supports).
+      ingredients = {{type = "item", name = "ups-silo-generic", amount = i}},
+      results = {{type = "item", name = "ups-silo-item-" .. i, amount = 1}}
     }
   })
 
@@ -155,13 +174,22 @@ for i = 1, 27 do
   -- (ups-silo-1x1) - a second item would just be a pointless exact
   -- duplicate of the one above, so skip it.
   if i > 1 then
+    -- Item only, deliberately no recipe any more: a fresh drag/pipette
+    -- never grants this (see control.lua's resolve_target - vertical
+    -- drags resolve to the horizontal item, rotated, instead), and
+    -- without an enabled recipe it won't show up in the remote-view
+    -- build panel either. Still exists, fully functional, purely for
+    -- back-compat with anything already placed, blueprinted, or
+    -- copy-pasted from before this version. Deconstruction/mining is
+    -- unaffected either way - minable.result in data.lua already
+    -- always points at the generic item, independent of recipes.
     data:extend({
       {
         type = "item",
         name = "ups-silo-item-v-" .. i,
         icons = build_size_icons("__UPS-silos__/graphics/entity/high-chest-icon.png", i),
         icon_size = 64,
-        localised_name = {"ups-silo.name-vertical", tostring(i)},
+        localised_name = {"ups-silo.name-sized", tostring(i)},
         localised_description = {"ups-silo.stack-info", tostring(4 * i), tostring(i)},
         group = "ups-silo-group",
         subgroup = "ups-silo-chassis-vertical",
